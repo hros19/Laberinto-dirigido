@@ -5,67 +5,29 @@
  * leídos desde archivos .txt. El módulo se encarga de leer el archivo, crear el laberinto
  * y resolverlo. Los resultados son pasados a la interfaz gráfica para su visualización e
  * interacción.
- * 
- * ------------------------------------------------------------------------------------------------
- * 
  * Instituto Tecnológico de Costa Rica
  * Escuela de Ingeniería en Computación
  * Lenguajes de Programación
  * II Semestre, año 2022
  * Profesor: Allan Rodríguez Dávila
- * 
- * ------------------------------------------------------------------------------------------------
- *
  * Autor: Hansol Antay Rostrán
  * Carné: 2020319635
- *
  */
 
-% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ use_module(library(pio)).
+
 % :: Manejo de archivos y definición de la matriz :: %
 
-% -------------------------------------------------------------------------------------------------
-% Lectura de archivos
-% Source: https://stackoverflow.com/questions/4805601/read-a-file-line-by-line-in-prolog
-% -------------------------------------------------------------------------------------------------
-leer_archivo(Stream, []) :-
-    at_end_of_stream(Stream).
+% Read file and return a list of lists with pio
+lines([])           --> call(eos), !.
+lines([Line|Lines]) --> line(Line), lines(Lines).
 
-leer_archivo(Stream, [X|L]) :-
-    \+ at_end_of_stream(Stream),
-    read(Stream, X),
-    leer_archivo(Stream, L).
+eos([], []).
 
-% -------------------------------------------------------------------------------------------------
-% archivo_a_matriz(+Archivo, -Matriz)
-% Recibe la dirección de memoria y devuelve una matriz
-% -------------------------------------------------------------------------------------------------
-archivo_a_matriz(Path, Matrix) :-
-    open(Path, read, Stream),
-    leer_archivo(Stream, Matrix),
-    close(Stream).
+line([])     --> ( "\n" ; call(eos) ), !.
+line([L|Ls]) --> [L], line(Ls).
 
-% -------------------------------------------------------------------------------------------------
-% definir_archivo_matriz(+Path)
-% Recibe la dirección de memoria y define la matriz que se usará para el laberinto
-% -------------------------------------------------------------------------------------------------
-definir_archivo_matriz(Path) :-
-    archivo_a_matriz(Path, Matrix),
-    assert(matriz(Matrix)).
-% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 % :: Predicados para definición de reglas :: %
-
-% Agregar paredes (representadas por 'x' en el archivo .txt)
-agregar_pared((X, Y)) :- asserta(pared((X, Y))).
-
-agregar_paredes([]).
-agregar_paredes([Pared|Resto]) :- agregar_pared(Pared), agregar_paredes(Resto).
-
-eliminar_paredes([]).
-eliminar_paredes([Pared|Resto]) :- retract(pared(Pared)), eliminar_paredes(Resto).
 
 % Determinar camino de solución
 agregar_solucion((X, Y)) :- asserta(solucion((X, Y))).
@@ -91,37 +53,14 @@ agregar_cruce((X, Y)) :- asserta(cruce((X, Y))).
 agregar_cruces([]).
 agregar_cruces([Cruce|Resto]) :- agregar_cruce(Cruce), agregar_cruces(Resto).
 
+agregar_cruce_pendiente((X, Y)) :- asserta(cruce_pendiente((X, Y))).
+agregar_cruces_pendientes([]).
+agregar_cruces_pendientes([Cruce|Resto]) :- agregar_cruce_pendiente(Cruce), agregar_cruces_pendientes(Resto).
+
 % Agregar posiciones visitadas (para que no se vuelvan a visitar)
 agregar_posicion_visitada((X, Y)) :-
     posicion_visitada((X, Y)) -> true;
     asserta(posicion_visitada((X, Y))).
-% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-% :: Obtención de datos del laberinto :: %
-
-% Obtención de dimensiones del laberinto
-obtener_cantidad_filas(Matriz, CantidadFilas) :- length(Matriz, CantidadFilas).
-
-obtener_cantidad_columnas(Matriz, CantidadColumnas) :- 
-    nth0(0, Matriz, Fila),
-    length(Fila, CantidadColumnas).
-
-obtener_dimensiones_matriz(Dimensiones) :-
-    matriz(Matriz),
-    obtener_cantidad_filas(Matriz, CantidadFilas),
-    obtener_cantidad_columnas(Matriz, CantidadColumnas),
-    Dimensiones = (CantidadFilas, CantidadColumnas).
-
-% Calcular posicion de inicio y fin (desde el archivo .txt)
-obtener_coordenadas_inicio(Matrix, X, Y) :-
-    nth0(Y, Matrix, Row),
-    nth0(X, Row, i).
-
-obtener_coordenadas_final(Matrix, X, Y) :-
-    nth0(Y, Matrix, Row),
-    nth0(X, Row, f).
 
 % Obtiene el valor de una posición en la matriz
 obtener_valor_posicion((X, Y), Valor) :-
@@ -129,26 +68,6 @@ obtener_valor_posicion((X, Y), Valor) :-
     nth0(X, Matrix, Row),
     nth0(Y, Row, Valor).
 
-% Obtener las posiciones de las paredes de la matriz
-posiciones_de_paredes_en_fila([], _, _, []).
-posiciones_de_paredes_en_fila([x|Cola], X, Y, [(Y, X)|Restantes]) :-
-    X1 is X + 1,
-    posiciones_de_paredes_en_fila(Cola, X1, Y, Restantes).
-
-posiciones_de_paredes_en_fila([_|Cola], X, Y, Posiciones) :-
-    X1 is X + 1,
-    posiciones_de_paredes_en_fila(Cola, X1, Y, Posiciones).
-
-posiciones_de_paredes_en_matriz([], _, []).
-posiciones_de_paredes_en_matriz([Fila|Resto], Y, Posiciones) :-
-    Y1 is Y + 1,
-    posiciones_de_paredes_en_fila(Fila, 0, Y, PosicionesEnFila),
-    posiciones_de_paredes_en_matriz(Resto, Y1, RestoPosiciones),
-    append(PosicionesEnFila, RestoPosiciones, Posiciones).
-% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 % :: Definición de reglas del laberinto respecto a movimientos :: %
 
 % Movimientos dependiendo del valor de la casilla.
@@ -189,8 +108,25 @@ posicion_valida((X, Y)) :-
     obtener_valor_posicion((X, Y), Valor),
     Valor \= x.
 
-% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+obtener_movimientos((X, Y), MovimientosRes) :-
+    obtener_valor_posicion((X, Y), Valor),
+    obtener_movimientos_de_valor(Valor, Movimientos),
+    obtener_movimientos_aux((X, Y), Movimientos, MovimientosRes).
 
+obtener_movimientos_aux(_, [], []).
+obtener_movimientos_aux((X, Y), [Movimiento|Resto], MovimientosRes) :-
+    obtener_nueva_posicion((X, Y), Movimiento, (X1, Y1)),
+    posicion_viable((X1, Y1)) ->
+        obtener_movimientos_aux((X, Y), Resto, RestoMovimientos),
+        MovimientosRes = [Movimiento|RestoMovimientos];
+        obtener_movimientos_aux((X, Y), Resto, MovimientosRes).
+
+posicion_viable((X, Y)) :-
+    posicion_final((X, Y)) -> true;
+    posicion_actual((X, Y)) -> false;
+    pared((X, Y)) -> false;
+    obtener_valor_posicion((X, Y), Valor),
+    Valor \= x.
 
 % ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 % :: Parte algoritmica (Resolución del laberinto) :: %
@@ -217,6 +153,11 @@ cruces_disponibles(CrucesDisponibles) :-
     posiciones_visitadas(PosicionesVisitadas),
     findall((X, Y), (member((X, Y), PosicionesVisitadas), obtener_movimientos_posibles((X, Y), MovimientosPosibles), MovimientosPosibles \= []), CrucesDisponibles).
 
+% Consulta si una posicion es perteneciente a la solucion final.
+pertenece_a_solucion((X, Y)) :-
+    obtener_camino_solucion(Camino),
+    member((X, Y), Camino).
+
 % Tomará un cruce de la lista de cruces y lo procesará hasta que no tenga más movimientos posibles.
 mover_desde_cruce :-
     cruces_disponibles(CrucesDisponibles),
@@ -226,11 +167,6 @@ mover_desde_cruce :-
     obtener_nueva_posicion((Xc, Yc), Movimiento, (Xf, Yf)),
     agregar_posicion_visitada((Xf, Yf)),
     solucionar((Xf, Yf)).
-
-% Obtiene la última posición visitada y la retorna.
-obtener_ultima_pos_visitada((X, Y)) :-
-    posiciones_visitadas(PosicionesVisitadas),
-    last(PosicionesVisitadas, (X, Y)).
 
 % Retorna todas las posiciones visitadas en una lista.
 posiciones_visitadas(PosicionesVisitadas) :-
@@ -265,13 +201,38 @@ cruces_visitadas(CrucesVisitadas) :-
     pos_visitadas_inv(PosicionesVisitadasInv),
     findall((X, Y), (member((X, Y), PosicionesVisitadasInv), obtener_valor_posicion((X, Y), Valor), Valor = c), CrucesVisitadas).
 
-c :-
+% A cada cruce visitada almacenarla como una cruce pendiente, no agregar si ya se encuentra en la lista.
+determinar_cruces_pendientes :-
+    retract(cruce_pendiente((-1,-1))),
     cruces_visitadas(CrucesVisitadas),
-    write(CrucesVisitadas).
+    member((X, Y), CrucesVisitadas),
+    not(cruce_pendiente((X, Y))),
+    asserta(cruce_pendiente((X, Y))),
+    determinar_cruces_pendientes.
 
-p :-
-    pos_visitadas_inv(PosicionesVisitadas),
-    write(PosicionesVisitadas).
+% Obtener los movimientos de un cruce pendiente, son los movimientos que no son celda_sin_solucion,
+% ni pared, ni parte de la solución.
+obtener_movimientos_cruce_pendiente((X, Y), MovimientosPosibles) :-
+    obtener_movimientos_posibles((X, Y), MovimientosPosibles),
+    findall(Movimiento, (member(Movimiento, MovimientosPosibles), obtener_nueva_posicion((X, Y), Movimiento, (Xf, Yf)), not(celda_sin_solucion((Xf, Yf))), not(camino_solucion((Xf, Yf)))), MovimientosPosibles).
+
+obtener_cruces_pendientes(CrucesPendientes) :-
+    findall((X, Y), cruce_pendiente((X, Y)), CrucesPendientes).
+
+% Mientras haya cruces pendientes, moverse desde un cruce pendiente
+% luego de moverse desde un cruce pendiente, se debe eliminar el cruce pendiente de la lista de cruces pendientes
+mover_desde_cruce_pendiente :-
+    obtener_cruces_pendientes(CrucesPendientes),
+    CrucesPendientes = [] -> true;
+    reiniciar_base_de_conocimiento,
+    member((Xc, Yc), CrucesPendientes),
+    retract(cruce_pendiente((Xc, Yc))),
+    jugar_desde((Xc, Yc)).
+
+% Imprimir las cruces pendientes
+cp(CrucesPendientes) :-
+    findall((X, Y), cruce_pendiente((X, Y)), CrucesPendientes),
+    write(CrucesPendientes).
 
 % Distancia manhattan entre dos puntos
 distancia_manhattan((X1, Y1), (X2, Y2), Distancia) :-
@@ -353,63 +314,52 @@ obtener_pos_no_solucion(PosicionesABorrar) :-
     findall((X, Y), (member((X, Y), PosicionesVisitadas), not(camino_solucion((X, Y)))), PosicionesNoCaminoSolucion),
     append(PosicionesBorradas, PosicionesNoCaminoSolucion, PosicionesABorrar).
 
-z :-
-    camino_solucion((X, Y)),
-    write((X, Y)), nl,
-    fail.
+% Borra los elementos duplicados de una lista.
+borrar_duplicados([], []).
+borrar_duplicados([X|Xs], Ys) :-
+    member(X, Xs), !,
+    borrar_duplicados(Xs, Ys).
 
-y :-
-    posicion_borrada((X, Y)),
-    write((X, Y)), nl,
-    fail.
+borrar_duplicados([X|Xs], [X|Ys]) :-
+    borrar_duplicados(Xs, Ys).
 
-x :-
-    obtener_pos_no_solucion(Posiciones),
-    write(Posiciones), nl,
-    fail.
-
-w :-
-    pos_visitadas_inv(Posiciones),
-    write(Posiciones), nl,
-    fail.
+obtener_camino_solucion(CaminoSolcion) :-
+    findall((X, Y), camino_solucion((X, Y)), CaminoAux),
+    borrar_duplicados(CaminoAux, CaminoSolcion).
 
 reiniciar_base_de_conocimiento :-
     retractall(posicion_visitada(_)),
     retractall(posicion_borrada(_)),
-    retractall(camino_solucion(_)),
-    retractall(posicion_final(_)),
     retractall(posicion_inicial(_)),
-    retractall(pos_visitadas_inv(_)),
-    retractall(posiciones_visitadas(_)),
-    retractall(posiciones_borradas(_)),
-    retractall(posiciones_no_solucion(_)),
+    retractall(posicion_visitada(_)),
+    retractall(posicion_borrada(_)),
     retractall(posicion_sig_a_procesar(_)).
 
 jugar_desde((X, Y)) :-
-    matriz(Matriz),
-    posiciones_de_paredes_en_matriz(Matriz, 0, Posiciones),
-    obtener_coordenadas_final(Matriz, (Xf, Yf)),
-    definir_posicion_final((Yf, Xf)),
     definir_posicion_actual((X, Y)),
     definir_posicion_inicial((X, Y)),
     asserta(posicion_visitada((X, Y))),
     asserta(sig_a_procesar([])),
-    agregar_paredes(Posiciones),
     solucionar((X, Y)).
 
-% Punto de arranque (previamente se tuvo que haber definido el archivo de matriz).
-% definir_archivo_matriz(Path), siendo (Path) la ruta del archivo de matriz (String).
-% Posteriormente se llama a terminar_laberinto.
-main :-
-    definir_archivo_matriz('./matrices/matriz_base.txt'),
-    matriz(Matriz),
-    posiciones_de_paredes_en_matriz(Matriz, 0, Posiciones),
-    obtener_coordenadas_inicio(Matriz, X, Y),
-    obtener_coordenadas_final(Matriz, Xf, Yf),
-    definir_posicion_actual((Y, X)),
-    definir_posicion_inicial((Y, X)),
-    definir_posicion_final((Yf, Xf)),
-    asserta(posicion_visitada((Y, X))),
+run :-
+    posicion_inicial((X, Y)),
+    asserta(posicion_visitada((X, Y))),
     asserta(sig_a_procesar([])),
-    agregar_paredes(Posiciones),
-    solucionar((Y, X)).
+    asserta(cruce_pendiente((-1,-1))),
+    asserta(celda_sin_solucion((-1,-1))),
+    solucionar((X, Y)).
+
+% Pregunta si una tupla es parte de la solucion.
+es_parte_solucion((X, Y)) :-
+    obtener_camino_solucion(Camino),
+    member((X, Y), Camino).
+
+% Recibe una posición, verifica los movimientos posibles
+% y retorna el movimiento que sea parte del camino de solución
+obtener_ayuda((X,Y), (Xa, Ya)) :- 
+    obtener_movimientos((X,Y), Movimientos),
+    member(Mov, Movimientos),
+    obtener_nueva_posicion((X,Y), Mov, (Xa, Ya)),
+    es_parte_solucion((Xa, Ya)).
+
