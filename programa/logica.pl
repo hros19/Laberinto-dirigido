@@ -363,3 +363,11 @@ obtener_ayuda((X,Y), (Xa, Ya)) :-
     obtener_nueva_posicion((X,Y), Mov, (Xa, Ya)),
     es_parte_solucion((Xa, Ya)).
 
+% Recibe una posición actual, y una posición objetivo.
+% Retorna true si la posición objetivo es un movimiento válido de la posición actual.
+es_movimiento_valido((X, Y), (Xs, Ys)) :-
+    obtener_movimientos((X,Y), Movimientos),
+    member(Mov, Movimientos),
+    obtener_nueva_posicion((X,Y), Mov, (Xn, Yn)),
+    Xn = Xs,
+    Yn = Ys.
