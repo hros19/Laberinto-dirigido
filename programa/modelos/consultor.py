@@ -5,7 +5,7 @@ Descripción: maneja la comunicación con el motor de inferencia Prolog
 Autor: Hansol Antay Rostrán
 Fecha de creación: 27 de octubre, 2022
 '''
-from swiplserver import PrologMQI, PrologThread
+from swiplserver import PrologMQI
 import os
 
 class Consultor:
@@ -13,6 +13,9 @@ class Consultor:
   """
   
   def __init__(self):
+    """Constructor principal sin parámetros
+    """
+    
     self.mqi = PrologMQI()
     self.pthread = self.mqi.create_thread()
     self.set_directorio()
@@ -35,7 +38,7 @@ class Consultor:
     self.pthread.query(
       'cd("{}")'.format(ruta)
     )
-    print(ruta)
+
     self.cargar_base_de_conocimiento()
     
   def cargar_base_de_conocimiento(self):
@@ -47,8 +50,18 @@ class Consultor:
     )
     
   def definir_valores_iniciales(self, path):
+    """Define la matriz, las posiciones iniciales y finales de la matriz
+
+    Args:
+        path (string): La ruta de la matriz para cargar
+
+    Returns:
+        list<list>: La matriz con valores decodificados
+    """
+    
     matriz = self.cargar_matriz(path)
     self.set_posiciones_inic(matriz)
+    return matriz
     
   def cargar_matriz(self, path):
     """Carga la matriz desde prolog, se decodifica y se define en la base de conocimiento
@@ -281,10 +294,8 @@ class Consultor:
         posicion (tuple): Posicion a consultar la ayuda
 
     Returns:
-        tuple: Tupla a mover (sugerencia)
-        
-        En caso de no haber un movimiento que lleve a la
-        solución, retorna (-1, -1).
+        list<tuple>: Lista de tuplas con las posiciones sugeridas
+        []: si no hay sugerencias
     """
     
     sugerencia_json = self.pthread.query(
@@ -292,7 +303,7 @@ class Consultor:
     )
     
     if (bool(sugerencia_json) == False):
-      return (-1, -1)
+      return []
     
     sugerencias = []
     for sug in sugerencia_json:
@@ -303,3 +314,19 @@ class Consultor:
     
     return sugerencias
     
+  def es_movimiento_valido(self, posicion_inicial, posicion_destino):
+    """Verifica que una posicion destino sea un movimiento valido de una posicion inicial
+
+    Args:
+        posicion_inicial (tuple): Posicion inicial de la matriz
+        posicion_destino (tuple): Posicion destino de la matriz
+    
+    Returns:
+        bool: True, si la posicion destino es un movimiento valido y directo de la posicion inicial
+    """
+    return bool(
+      self.pthread.query(
+      'es_movimiento_valido({}, {})'.format(posicion_inicial, posicion_destino)
+      )
+    )
+  
